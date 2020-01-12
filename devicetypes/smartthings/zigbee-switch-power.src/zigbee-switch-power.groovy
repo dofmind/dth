@@ -51,6 +51,9 @@ metadata {
 		fingerprint profileId: "0104", deviceId: "0051", inClusters: "0000, 0003, 0004, 0005, 0006, 0B04, 1000, 0702", outClusters: "0019", manufacturer: "AduroSmart Eria", model: "AD-SmartPlug3001", deviceJoinName: "Eria Zigbee Smart Plug"
 		fingerprint profileId: "0104", deviceId: "010A", inClusters: "0000, 0003, 0004, 0005, 0006, 1000", outClusters: "0019", manufacturer: "AduroSmart Eria", model: "BPU3", deviceJoinName: "Eria Zigbee On/Off Plug"
 		fingerprint profileId: "0104", deviceId: "0101", inClusters: "0000, 0003, 0004, 0005, 0006, 0008, 1000", outClusters: "0019", manufacturer: "AduroSmart Eria", model: "BDP3001", deviceJoinName: "Eria Zigbee Dimmable Plug"
+
+        // Dawon
+        fingerprint endpointId: "0x01", profileId: "0104", deviceId: "0051", inClusters: "0000, 0002, 0003, 0004, 0006, 0019, 0702, 0B04, 0008, 0009", outClusters: "0000, 0002, 0003, 0004, 0006, 0019, 0702, 0B04, 0008, 0009", manufacturer: "DAWON_DNS", model: "PM-B530-ZB", deviceJoinName: "DAWON SmartPlug 16A"
 	}
 
 	tiles(scale: 2) {
@@ -111,7 +114,11 @@ def refresh() {
 		// This needs to be the first binding table entry because the device will automatically write this entry each time it restarts
 		cmds += ["zdo bind 0x${device.deviceNetworkId} 2 1 0x0006 {${device.zigbeeId}} {${device.zigbeeId}}", "delay 2000"]
 	}
-	cmds + zigbee.onOffConfig(0, reportIntervalMinutes * 60) + zigbee.simpleMeteringPowerConfig() + zigbee.electricMeasurementPowerConfig()
+	if (device.getDataValue("manufacturer") == "DAWON_DNS") {
+		cmds + zigbee.onOffConfig(0, reportIntervalMinutes * 60) + zigbee.configureReporting(zigbee.SIMPLE_METERING_CLUSTER, 0x0400, DataType.INT24, 1, 600, 0x01) + zigbee.configureReporting(zigbee.ELECTRICAL_MEASUREMENT_CLUSTER, 0x050B, DataType.INT16, 1, 600, 0x0001)
+	} else {
+		cmds + zigbee.onOffConfig(0, reportIntervalMinutes * 60) + zigbee.simpleMeteringPowerConfig() + zigbee.electricMeasurementPowerConfig()
+	}
 }
 
 def configure() {
@@ -119,7 +126,7 @@ def configure() {
 	if ((device.getDataValue("manufacturer") == "Develco Products A/S") || (device.getDataValue("manufacturer") == "Aurora"))  {
 		device.updateDataValue("divisor", "1")
 	}
-	if (device.getDataValue("manufacturer") == "SALUS") {
+	if ((device.getDataValue("manufacturer") == "SALUS") || (device.getDataValue("manufacturer") == "DAWON_DNS"))  {
 		device.updateDataValue("divisor", "1")
 	}
 	return configureHealthCheck()
@@ -134,7 +141,11 @@ def configureHealthCheck() {
 def updated() {
 	log.debug "in updated()"
 	// updated() doesn't have it's return value processed as hub commands, so we have to send them explicitly
-	def cmds = configureHealthCheck()
+	if (device.getDataValue("manufacturer") == "DAWON_DNS") {
+		def cmds = configure()
+	} else {
+		def cmds = configureHealthCheck()
+	}
 	cmds.each{ sendHubCommand(new physicalgraph.device.HubAction(it)) }
 }
 
